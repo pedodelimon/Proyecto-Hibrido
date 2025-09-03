@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurante Sabores</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+  <h1 class="text-3xl font-bold mb-6 text-gray-800"> Restaurante Sabores</h1>
+
+  <!-- Pantallas -->
+  <div id="pantalla-inicial" class="pantalla">
+    <button id="btnNuevoPedido" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+      + Nuevo Pedido
+    </button>
+    <button id="btnVerHistorial" class="ml-4 bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition">
+      Ver Historial
+    </button>
+  </div>
+
+  <!-- Paso 1 -->
+  <div id="pantalla-paso1" class="pantalla hidden bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Paso 1: Datos del Cliente</h2>
+    <input id="nombreCliente" type="text" placeholder="Nombre del cliente" class="w-full p-2 border rounded-lg mb-4">
+    <div class="flex justify-between">
+      <button class="btnCancelar bg-red-500 text-white px-4 py-2 rounded">Cancelar</button>
+      <button id="btnPaso1" class="bg-green-600 text-white px-4 py-2 rounded">Siguiente</button>
+    </div>
+  </div>
+
+  <!-- Paso 2 -->
+  <div id="pantalla-paso2" class="pantalla hidden w-full max-w-5xl">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Paso 2: Selecciona tus productos</h2>
+    <div id="menu" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    <div class="flex justify-between mt-6">
+      <button class="btnCancelar bg-red-500 text-white px-4 py-2 rounded">Cancelar</button>
+      <button id="btnPaso2" class="bg-green-600 text-white px-4 py-2 rounded">Siguiente</button>
+    </div>
+  </div>
+
+  <!-- Paso 3 -->
+  <div id="pantalla-paso3" class="pantalla hidden bg-white shadow-lg rounded-xl p-6 w-full max-w-lg">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Paso 3: Confirmar Pedido</h2>
+    <div id="resumenOrden" class="mb-4 text-gray-700"></div>
+    <label class="block font-medium text-gray-600 mb-1">Método de Pago</label>
+    <select id="metodoPago" class="w-full p-2 border rounded-lg mb-4">
+      <option value="Efectivo">Efectivo</option>
+      <option value="Tarjeta">Tarjeta</option>
+      <option value="Transferencia">Transferencia</option>
+    </select>
+    <textarea id="comentarios" placeholder="Comentarios" class="border p-2 w-full mb-4 rounded"></textarea>
+    <div class="flex justify-between">
+      <button class="btnCancelar bg-red-500 text-white px-4 py-2 rounded">Cancelar</button>
+      <button id="btnCompletar" class="bg-green-600 text-white px-4 py-2 rounded">Completar Pedido</button>
+    </div>
+  </div>
+
+  <!-- Confirmación -->
+  <div id="pantalla-confirmacion" class="pantalla hidden text-center">
+    <h2 class="text-2xl font-bold mb-4"> Pedido Confirmado</h2>
+    <p id="numPedido" class="font-bold text-lg mb-4"></p>
+    <button onclick="mostrarPantalla('pantalla-inicial')" class="bg-blue-600 text-white px-4 py-2 rounded">Volver al Inicio</button>
+  </div>
+
+  <!-- Modal historial -->
+  <div id="modalHistorial" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 relative">
+      <button id="cerrarHistorial" class="absolute top-3 right-3 text-gray-600 hover:text-black">x</button>
+      <h2 class="text-xl font-semibold mb-4 text-gray-700">Historial de pedidos</h2>
+      <ul id="lista-pedidos" class="space-y-2 text-gray-700 max-h-80 overflow-y-auto"></ul>
+    </div>
+  </div>
+
+  <script>
+    // Datos
+    const menus = [
+      { id: 1, nombre: "Pizza Margherita", precio: 10.99, descripcion: "Pizza clásica con tomate, mozzarella y albahaca." },
+      { id: 2, nombre: "Hamburguesa Clásica", precio: 8.5, descripcion: "Carne, lechuga, tomate y salsa especial." },
+      { id: 3, nombre: "Ensalada César", precio: 6.75, descripcion: "Lechuga, crutones, pollo y aderezo César." },
+      { id: 4, nombre: "Pasta Carbonara", precio: 9.25, descripcion: "Espagueti con salsa de huevo, queso y panceta." },
+      { id: 5, nombre: "Tacos al Pastor", precio: 7.99, descripcion: "Tacos de cerdo con piña y cilantro." },
+    ];
+
+    const STORAGE_KEY = "historialPedidos";
+    let historial = [];
+    let carrito = [];
+    let nombreCliente = "";
+
+    // Mostrar pantalla
+    function mostrarPantalla(id) {
+      document.querySelectorAll(".pantalla").forEach(p => p.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    // Render historial
+    function renderHistorial() {
+      const lista = document.getElementById("lista-pedidos");
+      lista.innerHTML = "";
+      historial.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "border-b pb-2";
+        li.innerHTML = `
+          <p><strong>${p.nombre}</strong> pidió: ${p.menu}</p>
+          <p>Cantidad total: ${p.cantidad}</p>
+          <p>Total: $${p.total}</p>
+          <p>Método de pago: ${p.pago}</p>
+          <p>Comentarios: ${p.comentarios || "Ninguno"}</p>
+          <p class="text-sm text-gray-500">${p.fecha}</p>
+        `;
+        lista.appendChild(li);
+      });
+    }
+
+    async function saveHistorial() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(historial));
+    }
+    function loadHistorial() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) historial = JSON.parse(data);
+      renderHistorial();
+    }
+
+    // Render menú
+    const menuContainer = document.getElementById("menu");
+    menus.forEach(menu => {
+      const card = document.createElement("div");
+      card.className = "bg-white p-4 rounded-xl shadow hover:shadow-xl transition";
+      card.innerHTML = `
+        <h3 class="font-bold">${menu.nombre}</h3>
+        <p class="text-sm text-gray-600">${menu.descripcion}</p>
+        <p class="text-blue-600 font-bold mt-2">$${menu.precio.toFixed(2)}</p>
+        <div class="flex items-center space-x-2 mt-2">
+          <button class="btn-restar bg-red-500 text-white px-2 rounded">-</button>
+          <span class="cantidad font-bold">0</span>
+          <button class="btn-sumar bg-green-500 text-white px-2 rounded">+</button>
+        </div>
+      `;
+      let cantidad = 0;
+      const cantidadEl = card.querySelector(".cantidad");
+      const btnSumar = card.querySelector(".btn-sumar");
+      const btnRestar = card.querySelector(".btn-restar");
+
+      function actualizarCarrito() {
+        const item = carrito.find(c => c.id === menu.id);
+        if (cantidad > 0) {
+          if (item) {
+            item.cantidad = cantidad;
+          } else {
+            carrito.push({ ...menu, cantidad });
+          }
+        } else {
+          carrito = carrito.filter(c => c.id !== menu.id);
+        }
+      }
+
+      btnSumar.addEventListener("click", () => {
+        cantidad++;
+        cantidadEl.textContent = cantidad;
+        actualizarCarrito();
+      });
+
+      btnRestar.addEventListener("click", () => {
+        if (cantidad > 0) {
+          cantidad--;
+          cantidadEl.textContent = cantidad;
+          actualizarCarrito();
+        }
+      });
+
+      menuContainer.appendChild(card);
+    });
+
+    // Eventos de pasos
+    document.getElementById("btnNuevoPedido").addEventListener("click", () => {
+      carrito = [];
+      nombreCliente = "";
+      mostrarPantalla("pantalla-paso1");
+    });
+
+    document.getElementById("btnPaso1").addEventListener("click", () => {
+      const nombre = document.getElementById("nombreCliente").value;
+      if (!nombre) return alert("Ingrese el nombre del cliente.");
+      nombreCliente = nombre;
+      mostrarPantalla("pantalla-paso2");
+    });
+
+    document.getElementById("btnPaso2").addEventListener("click", () => {
+      if (carrito.length === 0) return alert("Seleccione al menos un producto.");
+      const resumen = document.getElementById("resumenOrden");
+      resumen.innerHTML = carrito
+        .map(m => `<p>${m.nombre} (x${m.cantidad}) - $${(m.precio * m.cantidad).toFixed(2)}</p>`)
+        .join("");
+      mostrarPantalla("pantalla-paso3");
+    });
+
+    document.getElementById("btnCompletar").addEventListener("click", () => {
+      const metodoPago = document.getElementById("metodoPago").value;
+      const comentarios = document.getElementById("comentarios").value;
+      let total = carrito.reduce((sum, m) => sum + (m.precio * m.cantidad), 0).toFixed(2);
+
+      const pedido = {
+        id: Date.now(),
+        nombre: nombreCliente,
+        menu: carrito.map(m => `${m.nombre} (x${m.cantidad})`).join(", "),
+        cantidad: carrito.reduce((sum, m) => sum + m.cantidad, 0),
+        total,
+        pago: metodoPago,
+        comentarios,
+        fecha: new Date().toLocaleString()
+      };
+
+      historial.push(pedido);
+      saveHistorial();
+      renderHistorial();
+
+      document.getElementById("numPedido").textContent = `Pedido #${pedido.id}`;
+      mostrarPantalla("pantalla-confirmacion");
+    });
+
+    // Cancelar pedido en cualquier paso
+    document.querySelectorAll(".btnCancelar").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (confirm("¿Seguro que quieres cancelar este pedido?")) {
+          carrito = [];
+          nombreCliente = "";
+          mostrarPantalla("pantalla-inicial");
+        }
+      });
+    });
+
+    // Modal historial
+    const modalHistorial = document.getElementById("modalHistorial");
+    document.getElementById("btnVerHistorial").addEventListener("click", () => {
+      modalHistorial.classList.remove("hidden");
+    });
+    document.getElementById("cerrarHistorial").addEventListener("click", () => {
+      modalHistorial.classList.add("hidden");
+    });
+
+    // Cargar historial
+    loadHistorial();
+  </script>
+</body>
+</html>
